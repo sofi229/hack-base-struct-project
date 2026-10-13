@@ -75,6 +75,92 @@ docker compose exec backend flask --app main db upgrade
 > Модели нужно импортировать в `app/__init__.py` (или в `app/models/__init__.py`),
 > иначе Flask-Migrate их не увидит.
 
+## Запуск без Docker
+
+Нужны установленные Python 3.12+, Node.js 22+ и PostgreSQL.
+
+### 1. База данных
+
+Вариант А: PostgreSQL установлен локально. Создайте пользователя и базу:
+
+```bash
+psql -U postgres -c "CREATE USER app WITH PASSWORD 'app';"
+psql -U postgres -c "CREATE DATABASE app OWNER app;"
+```
+
+Вариант Б: поднять в Docker только БД, а бек и фронт запускать локально:
+
+```bash
+docker compose up db
+```
+
+### 2. Backend
+
+```bash
+cd backend
+
+# создать виртуальное окружение
+python -m venv venv
+
+# активировать
+source venv/bin/activate        # Linux / macOS
+venv\Scripts\activate           # Windows (cmd / PowerShell)
+
+# установить зависимости
+pip install -r requirements.txt
+
+# указать строку подключения к БД (хост localhost, а не db)
+export DATABASE_URL=postgresql://app:app@localhost:5432/app          # Linux / macOS
+set DATABASE_URL=postgresql://app:app@localhost:5432/app             # Windows cmd
+$env:DATABASE_URL="postgresql://app:app@localhost:5432/app"          # Windows PowerShell
+
+# применить миграции (если уже есть папка migrations)
+flask --app main db upgrade
+
+# запустить сервер
+flask --app main run --debug
+```
+
+Бекенд будет доступен на http://localhost:5000/api/health.
+
+Вместо `export` можно создать файл `backend/.env` со строкой `DATABASE_URL=...`. Flask подхватит его сам, а в git он не попадёт, потому что `.env` есть в `.gitignore`.
+
+Если миграций ещё нет, инициализируйте их так:
+
+```bash
+flask --app main db init      # один раз
+flask --app main db migrate -m "init"
+flask --app main db upgrade
+```
+
+Чтобы выйти из виртуального окружения, выполните `deactivate`.
+
+После установки новых библиотек обновляйте зависимости:
+
+```bash
+pip freeze > requirements.txt
+```
+
+### 3. Frontend
+
+В новом терминале:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Фронтенд будет доступен на http://localhost:5173. Адрес API берётся из переменной `VITE_API_URL`. Если она не задана, используется `http://localhost:5000/api`, так что для локального запуска ничего настраивать не нужно.
+
+Другие полезные команды:
+
+```bash
+npm run build      # продакшен-сборка в папку dist/
+npm run preview    # локальный просмотр собранной версии
+npm install <пакет>
+```
+
 ---
 
 ## Создание проекта с нуля
